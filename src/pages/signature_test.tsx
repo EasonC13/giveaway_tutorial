@@ -18,6 +18,12 @@ export default function Home() {
   useEffect(() => {
     const run = async () => {
       const keypair = Ed25519Keypair.generate();
+
+      const secretKey = keypair.getSecretKey();
+      const keypair2 = Ed25519Keypair.fromSecretKey(secretKey);
+      console.log(
+        keypair2.getPublicKey().toBase64() == keypair.getPublicKey().toBase64()
+      );
       const publicKey = keypair.getPublicKey();
       const receiverAddress =
         "0x96d9a120058197fce04afcffa264f2f46747881ba78a91beb38f103c60e315ae";

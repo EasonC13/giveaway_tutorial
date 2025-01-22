@@ -1,0 +1,9 @@
+[config]
+# will be set to mainnet by default if omitted
+rpc = "https://fullnode.testnet.sui.io:443"
+
+[packages]
+# based on source code (syntax same as in Move.toml):
+
+# an on-chain package:
+giveaway = { id = "0xcf5ea60fe885e3f5162e30b6f3b3218c344be94ab9aece30f96ebee35be39b97" }
