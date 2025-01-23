@@ -79,8 +79,13 @@ export default function Home() {
       });
       try {
         const value = (objectBag.data as any).content.fields.value;
-        console.log({ giftManager, objectBagId, objectBag, value });
-        setGiftValue(Number(BigInt(value) / BigInt(10 ** 9)));
+        console.log({
+          giftManager,
+          objectBagId,
+          objectBag,
+          value,
+        });
+        setGiftValue(Number(value) / 10 ** 9);
       } catch (error: any) {
         toast.error("Gift not found");
         router.push("/");

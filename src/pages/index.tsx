@@ -15,6 +15,7 @@ import "@mysten/dapp-kit/dist/index.css";
 import { Transaction } from "@mysten/sui/transactions";
 import { createGift } from "@/giveaway/giveaway/giveaway/functions";
 import { useRouter } from "next/router";
+import { Events } from "../components/Events";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -83,6 +84,9 @@ export default function Home() {
     const result = await signAndExecuteTransaction({
       transaction: tx,
     });
+    await suiClient.waitForTransaction({
+      digest: result.digest,
+    });
     router.push(`/claim/${secretKey}`);
   };
 
@@ -135,6 +139,7 @@ export default function Home() {
         >
           Disconnect
         </button>
+        <Events />
       </div>
     </div>
   );

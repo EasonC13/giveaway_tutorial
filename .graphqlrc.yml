@@ -1,0 +1,2 @@
+schema:
+  - src/utils/sui_schema.graphql
