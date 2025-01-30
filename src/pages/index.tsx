@@ -9,6 +9,7 @@ import {
   useSuiClient,
   useDisconnectWallet,
   useSignAndExecuteTransaction,
+  useSignTransaction,
 } from "@mysten/dapp-kit";
 import "@mysten/dapp-kit/dist/index.css";
 
@@ -16,6 +17,8 @@ import { Transaction } from "@mysten/sui/transactions";
 import { createGift } from "@/giveaway/giveaway/giveaway/functions";
 import { useRouter } from "next/router";
 import { Events } from "../components/Events";
+import { useEnokiFlow, useZkLogin } from "@mysten/enoki/react";
+import EnokiLogin from "@/components/EnokiLogin";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,20 +32,30 @@ const geistMono = Geist_Mono({
 
 export default function Home() {
   const { currentWallet, connectionStatus } = useCurrentWallet();
-  const address = currentWallet?.accounts?.[0].address;
+  let address = currentWallet?.accounts?.[0].address;
+  const enokiFlow = useEnokiFlow();
+  const { address: enokiAddress } = useZkLogin();
+  if (enokiAddress) {
+    address = enokiAddress;
+  }
   const [suiBalance, setSuiBalance] = useState(0);
+  const [loaded, setLoaded] = useState(false);
   const [suiAmountToSend, setSuiAmountToSend] = useState("0");
 
   const { mutate: disconnectWallet } = useDisconnectWallet();
   const { mutateAsync: signAndExecuteTransaction } =
     useSignAndExecuteTransaction();
+  const { mutateAsync: signTransaction } = useSignTransaction();
 
   const router = useRouter();
 
   const suiClient = useSuiClient();
   useEffect(() => {
     const run = async () => {
-      if (!address) return;
+      if (!address) {
+        setLoaded(true);
+        return;
+      }
       const data = [];
       let cursor: string | null = null;
       while (true) {
@@ -63,6 +76,7 @@ export default function Home() {
       }
       totalBalance = totalBalance / 1e9;
       setSuiBalance(totalBalance);
+      setLoaded(true);
     };
     run();
   }, [address]);
@@ -81,19 +95,41 @@ export default function Home() {
       coin: coinInput,
       vecU8: Array.from(publicKey.toRawBytes()),
     });
-    const result = await signAndExecuteTransaction({
-      transaction: tx,
+    tx.setSender(address);
+    let txBytes = await tx.build({
+      client: suiClient,
+    });
+    let signature;
+    if (enokiAddress) {
+      const signer = await enokiFlow.getKeypair({
+        network: "testnet",
+      });
+      signature = await signer.signTransaction(txBytes);
+    } else {
+      signature = await signTransaction({
+        transaction: tx,
+        chain: "sui:testnet",
+      });
+    }
+    const result = await suiClient.executeTransactionBlock({
+      transactionBlock: txBytes,
+      signature: signature.signature,
     });
     await suiClient.waitForTransaction({
       digest: result.digest,
     });
     router.push(`/claim/${secretKey}`);
   };
+  if (!loaded)
+    return (
+      <div className="h-screen w-full flex items-center justify-center"></div>
+    );
 
-  if (!currentWallet)
+  if (!address)
     return (
       <div className="h-screen w-full flex items-center justify-center">
         <ConnectButton />
+        <EnokiLogin />
       </div>
     );
   return (
@@ -101,6 +137,23 @@ export default function Home() {
       className={`${geistSans.variable} ${geistMono.variable} flex items-center justify-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)] bg-gray-900 text-white`}
     >
       <div className="flex flex-col gap-4 w-full max-w-md">
+        <div className="flex flex-col">
+          <label className="text-sm mb-2">Your Address</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              readOnly
+              value={address}
+              className="p-2 border rounded flex-1 bg-gray-800 border-gray-700 text-white"
+            />
+            <button
+              className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+              onClick={() => navigator.clipboard.writeText(address)}
+            >
+              Copy
+            </button>
+          </div>
+        </div>
         <div className="flex flex-col">
           <label className="text-sm mb-2">Current SUI Balance</label>
           <input
@@ -135,7 +188,13 @@ export default function Home() {
         </div>
         <button
           className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-          onClick={() => disconnectWallet()}
+          onClick={() => {
+            if (enokiAddress) {
+              enokiFlow.logout();
+            } else {
+              disconnectWallet();
+            }
+          }}
         >
           Disconnect
         </button>
